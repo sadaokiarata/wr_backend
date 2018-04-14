@@ -6,9 +6,9 @@ router.get('/', function (req, res) {
     Location.getAllLocations(function (res1) {
         var ip = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.socket.remoteAddress || req.connection.socket.remoteAddress;
         ip = ip.split(',')[0].split(':').slice(-1); //in case the ip returned in a format: "::ffff:146.xxx.xxx.xxx"
-        //ip[0] = "108.253.179.240";
+        ip[0] = "172.58.21.45";
         var mine = geoip.lookup(ip[0]);//'165.227.2.220');//45.56.159.198');
-        //console.log(ip, mine);
+        console.log(ip, mine);
         if (mine != null && mine.country == 'US') {
             mine.stateid = mine.cityid = -1;
             for (var i = 0; i < res1.length; i++) {

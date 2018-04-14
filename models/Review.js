@@ -19,9 +19,9 @@ var Review = {
                 callback({ret: -1, err: res.err});                                                  // fail
             } else {
                 if (req.search == undefined || req.search == '')  {
-                    db.query("SELECT COUNT(*) AS cnt FROM reviews WHERE origin_id=-1 AND city_id=?", [req.city], function(err1, res1) {
+                    db.query("SELECT COUNT(*) AS cnt FROM reviews WHERE origin_id=-1 AND (city_id=? OR TRUE)", [req.city], function(err1, res1) {
                         var cnt = 0;
-                        db.query("SELECT reviews.*,users.user_name AS sender_name FROM reviews,users WHERE users.user_id=reviews.writer_id AND reviews.origin_id=-1 AND city_id=? ORDER BY reviews.review_time DESC LIMIT ? OFFSET ?", [parseInt(req.city), parseInt(req.count), parseInt(req.offset)], function(err2, res2) {
+                        db.query("SELECT reviews.*,users.user_name AS sender_name FROM reviews,users WHERE users.user_id=reviews.writer_id AND reviews.origin_id=-1 AND (city_id=? OR TRUE) ORDER BY reviews.review_time DESC LIMIT ? OFFSET ?", [parseInt(req.city), parseInt(req.count), parseInt(req.offset)], function(err2, res2) {
                             if (res2.length == 0) {
                                 callback({ret: 0, total: 0, reviews: []});
                                 return;
@@ -51,8 +51,9 @@ var Review = {
                 } else {
                     req.search = '%' + req.search + '%';
                     req.offset = parseInt(req.offset);
-                    db.query("SELECT DISTINCT idx FROM (SELECT DISTINCT origin_id AS idx,review_time FROM reviews WHERE origin_id!=-1 AND city_id=? AND (review_title LIKE ? OR review_content LIKE ?) UNION SELECT review_id,review_time FROM reviews WHERE origin_id=-1 AND city_id=? AND (review_title LIKE ? OR review_content LIKE ?)) AS T1 ORDER BY review_time DESC", 
+                    db.query("SELECT DISTINCT idx FROM (SELECT DISTINCT origin_id AS idx,review_time FROM reviews WHERE origin_id!=-1 AND (city_id=? OR TRUE) AND (review_title LIKE ? OR review_content LIKE ?) UNION SELECT review_id,review_time FROM reviews WHERE origin_id=-1 AND (city_id=? OR TRUE) AND (review_title LIKE ? OR review_content LIKE ?)) AS T1 ORDER BY review_time DESC", 
                             [req.city, req.search, req.search, req.city, req.search, req.search], function(err1, res1) {
+                        console.log("dddd", err1);
                         var res2 = [];
                         var cnt = 0;
                         var result_count = Math.min(res1.length, req.offset + req.count) - req.offset;
@@ -94,6 +95,7 @@ var Review = {
             if (res.ret < 0) {
                 callback({ret: -1, err: res.err});                                                  // fail
             } else {
+                console.log("add review");
                 db.query("INSERT INTO reviews(writer_id, review_title, review_content, origin_id, city_id) VALUES(?, ?, ?, ?, ?)", [res.user_id, req.review_title, req.review_content, req.origin_id, req.city_id], function(err, res1) {
                     if (res1 != undefined && res1.affectedRows == 1)
                         callback({ret: 0});

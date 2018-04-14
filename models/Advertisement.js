@@ -1,5 +1,6 @@
 // Advertisement related APIs
 var DEFAULT_PAGESIZE = 10;
+var DEFAULT_PREMIUM_PAGESIZE = 12;
 var db = require('../dbconnection');
 var Constants = require('../constants');
 var User = require('../models/User');
@@ -81,7 +82,7 @@ var Advertisement = {
     // Get all premium advertisements
     getPremiumAds: function (req, callback) {
         if (req.offset == undefined || req.offset < 0) req.offset = 0;
-        if (req.count == undefined || req.count < 5 || req.count > 40) req.count = DEFAULT_PAGESIZE;
+        if (req.count == undefined || req.count < 5 || req.count > 40) req.count = DEFAULT_PREMIUM_PAGESIZE;
         db.query("SELECT COUNT(*) FROM advertisements,lookup_city,lookup_category WHERE paid=1 AND premium_open=1 AND advertisements.opened=1 AND lookup_city.city_id=advertisements.post_city AND lookup_category.category_id=advertisements.category AND advertisements.post_city=? AND advertisements.category=?", [req.city, req.cate], function(err, res1, fields) {
             db.query("SELECT advertisements.*,lookup_city.city_name,lookup_category.category_name FROM advertisements, lookup_city, lookup_category WHERE paid=1 AND premium_open=1 AND advertisements.opened=1 AND lookup_city.city_id=advertisements.post_city AND lookup_category.category_id = advertisements.category AND advertisements.post_city=? AND advertisements.category=? ORDER BY premium_time DESC LIMIT ? OFFSET ?", [req.city, req.cate, parseInt(req.count), parseInt(req.offset)], function (err, res2) {
                 callback({ret: 0, total: res1[0].cnt, premiums: res2});
@@ -310,20 +311,22 @@ var Advertisement = {
         });
     }
 };
-
-var RepostJob = schedule.scheduleJob('second:0, minute:0', function() {
-    console.log('Repost Job!');
-    db.query("UPDATE advertisements SET repost_time=NOW(),repost_count=repost_count-1 WHERE opened=1 AND HOUR(NOW())=work_hour1 AND repost_count>0 AND MOD(DATEDIFF(NOW(),post_time),repost_interval)=0", function (err, res) {
-        console.log("repost err:", err, res.affectedRows);
-    });
-    db.query("UPDATE advertisements SET premium_open=0 WHERE premium_open=1 AND HOUR(TIMEDIFF(NOW(), post_time))>premium_period*168*30", function (err, res) {});
-});
+// Move ad on top when move_times is bigger than 0
 var MoveOnTopJob = schedule.scheduleJob({second:0}, function() {
     console.log('Move on top!');
     db.query("UPDATE advertisements SET repost_time=NOW(),movetotop_times=movetotop_times-1 WHERE opened=1 AND movetotop_times>0 AND MINUTE(NOW())=MINUTE(post_time)", function (err, res) {
         console.log("moveontop err:", err, res.affectedRows);
     });
 });
+// Repost ad automatically
+var RepostJob = schedule.scheduleJob({second:0, minute:0}, function() {
+    console.log('Repost Job!');
+    db.query("UPDATE advertisements SET repost_time=NOW(),repost_count=repost_count-1 WHERE opened=1 AND ((HOUR(NOW()) + 16) % 24)=work_hour1 AND repost_count>0 AND MOD(DATEDIFF(NOW(),post_time),repost_interval)=0", function (err, res) {
+        console.log("repost err:", err, res.affectedRows);
+    });
+    db.query("UPDATE advertisements SET premium_open=0 WHERE premium_open=1 AND HOUR(TIMEDIFF(NOW(), post_time))>premium_period*168*30", function (err, res) {});
+});
+// Cycling premium ads
 var PremiumJob = schedule.scheduleJob({second:0}, function() {
     console.log('Premium Job!');
     var min = new Date().getMinutes();
